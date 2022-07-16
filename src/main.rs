@@ -3,14 +3,11 @@ mod enemy;
 mod player;
 mod prelude;
 
-use bevy::asset;
 use player::*;
 use prelude::*;
 
-use rand::Rng;
-
-use bullet::{tick_bullets, Bullet};
-use enemy::{tick_enemies, Enemy};
+use bullet::Bullet;
+use enemy::{Enemy, EnemyBundle};
 
 #[derive(Default)]
 pub struct Game {
@@ -18,16 +15,16 @@ pub struct Game {
 }
 
 fn main() {
-
     App::new()
         .init_resource::<Game>()
         .add_plugins(DefaultPlugins)
+        .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
+        .add_plugin(RapierDebugRenderPlugin::default())
         .add_startup_system(setup)
-        .add_system(player::handle_input)
-        .add_system(tick_enemies)
-        .add_system(tick_bullets)
+        .add_system(player::tick)
+        .add_system(enemy::tick)
+        .add_system(bullet::tick)
         .run();
-
 }
 
 fn setup(mut commands: Commands, mut game: ResMut<Game>, asset_server: Res<AssetServer>) {
@@ -44,21 +41,14 @@ fn setup(mut commands: Commands, mut game: ResMut<Game>, asset_server: Res<Asset
                 },
                 ..default()
             })
+            .insert(Collider::cuboid(75.0, 80.0))
+            .insert(Sensor)
             .insert(Player::default())
             .id(),
     );
 
     let tex: Handle<Image> = asset_server.load("../../../assets/enemy.png");
     for _ in 0..10 {
-        commands
-            .spawn_bundle(SpriteBundle {
-                texture: tex.clone(),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(200.0, 220.0)),
-                    ..default()
-                },
-                ..default()
-            })
-            .insert(Enemy{ position: rand_vec2(), radius: 1.0f32 });
+        commands.spawn_bundle(EnemyBundle::new(rand_vec2(), tex.clone()));
     }
 }

@@ -1,4 +1,6 @@
 pub use bevy::prelude::*;
+pub use bevy_rapier2d::prelude::*;
+
 use rand::Rng;
 
 pub fn rand_vec2() -> Vec2 {

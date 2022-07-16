@@ -9,6 +9,7 @@ edition = "2021"
 
 bevy = "0.7"
 rand = "0.8.5" 
+bevy_rapier2d = { version ="0.15", features=["debug-render"] }
 
 [profile.dev]
 opt-level = 1

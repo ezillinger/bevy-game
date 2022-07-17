@@ -16,12 +16,11 @@ impl Bullet {
 
 pub fn tick(
     mut commands: Commands,
-    input: Res<Input<KeyCode>>,
-    mut game: ResMut<Game>,
     time: Res<Time>,
     mut bullets: Query<(&mut Bullet, &mut Transform, &Collider)>,
-    mut enemies: Query<(&mut Enemy, &mut Transform, &Collider, Without<Bullet>)>,
+    enemies: Query<(&mut Enemy, &mut Transform, &Collider, Without<Bullet>)>,
     rapier_ctx: Res<RapierContext>,
+    mut game: ResMut<Game>,
 ) {
     for (mut bullet, mut transform, collider) in bullets.iter_mut() {
         bullet.update_position(time.as_ref());
@@ -36,8 +35,8 @@ pub fn tick(
             collider,
             QueryFilter::default(),
             |entity| {
-                if enemies.contains(entity) {
-                    println!("HIT {:?}", entity);
+                if let Ok(enemy) = enemies.get(entity) {
+                    game.player.score += enemy.0.point_value;
                     commands.entity(entity).despawn();
                 }
                 true

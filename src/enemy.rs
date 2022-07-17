@@ -9,6 +9,10 @@ pub struct Enemy {
     pub position: Vec2,
     pub radius: f32,
     pub damage: f32,
+
+    pub health: i32,
+    pub max_health: i32,
+
     pub hit_interval: Duration,
     pub point_value: i32,
 
@@ -33,10 +37,11 @@ impl EnemyBundle {
                 radius: 1.0,
                 damage: 10.0,
                 point_value: 100,
+                health: 100,
                 hit_interval: Duration::from_millis(300),
                 ..default()
             },
-            collider: Collider::cuboid(100.0, 100.0),
+            collider: Collider::capsule_y(50.0, 50.0),
             sprite: SpriteBundle {
                 texture: tex,
                 sprite: Sprite {
@@ -51,13 +56,17 @@ impl EnemyBundle {
 }
 
 pub fn tick(
-    commands: Commands,
+    mut commands: Commands,
     time: Res<Time>,
-    mut enemies: Query<(&mut Enemy, &mut Transform, &Collider)>,
+    mut enemies: Query<(Entity, &mut Enemy, &mut Transform, &Collider)>,
     mut game: ResMut<Game>,
     rapier_ctx: Res<RapierContext>,
 ) {
-    for (mut enemy, mut transform, collider) in enemies.iter_mut() {
+    for (entity, mut enemy, mut transform, collider) in enemies.iter_mut() {
+        if enemy.health <= 0 {
+            commands.entity(entity).despawn();
+        }
+
         enemy.hit_timer.tick(time.delta());
 
         enemy.position += rand_vec2() / 100.0f32;

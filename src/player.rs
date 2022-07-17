@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bevy::core::Stopwatch;
+use bevy::{core::Stopwatch, input::mouse::MouseMotion};
 
 use crate::*;
 
@@ -47,7 +47,7 @@ impl PlayerBundle {
     pub fn new(tex: Handle<Image>) -> PlayerBundle {
         return PlayerBundle {
             player: Player::default(),
-            collider: Collider::cuboid(100.0, 100.0),
+            collider: Collider::capsule_y(40.0, 40.0),
             sensor: Sensor,
             sprite: SpriteBundle {
                 texture: tex,
@@ -71,16 +71,19 @@ impl Player {
 pub fn tick(
     mut commands: Commands,
     input: Res<Input<KeyCode>>,
+    mouse: Res<Input<MouseButton>>,
+    windows: Res<Windows>,
     mut game: ResMut<Game>,
     time: Res<Time>,
+    images: Res<Assets<Image>>,
     mut transform: Query<&mut Transform>,
 ) {
-    const PLAYER_SPEED: f32 = 200.0;
-    const BULLET_SPEED: f32 = 800.0;
+    const PLAYER_SPEED: f32 = 400.0;
+    const BULLET_SPEED: f32 = 4000.0;
     const FIRE_INTERVAL: f32 = 0.25;
 
     if input.pressed(KeyCode::Escape) {
-        commands.insert_resource(NextState(GameState::Menu));
+        commands.insert_resource(NextState(GameState::Paused));
         return;
     }
 
@@ -91,23 +94,28 @@ pub fn tick(
 
     game.player.tick_cooldowns(time.delta());
 
-    if input.pressed(KeyCode::Left) {
-        game.player.direction = Vec2::new(-1.0, 0.0);
+    if let Some(window) = windows.get_primary() {
+        if let Some(mouse_pos) = window.cursor_position() {
+            let world_pos = mouse_pos - Vec2::new(window.width() / 2.0, window.height() / 2.0);
+            game.player.direction = (world_pos - game.player.position).normalize();
+        }
+    }
+
+    if input.pressed(KeyCode::Left) || input.pressed(KeyCode::A) {
         game.player.position.x -= PLAYER_SPEED * time.delta().as_secs_f32();
-    } else if input.pressed(KeyCode::Right) {
-        game.player.direction = Vec2::new(1.0, 0.0);
+    } else if input.pressed(KeyCode::Right) || input.pressed(KeyCode::D) {
         game.player.position.x += PLAYER_SPEED * time.delta().as_secs_f32();
     }
 
-    if input.pressed(KeyCode::Up) {
-        game.player.direction = Vec2::new(0.0, 1.0);
+    if input.pressed(KeyCode::Up) || input.pressed(KeyCode::W) {
         game.player.position.y += PLAYER_SPEED * time.delta().as_secs_f32();
-    } else if input.pressed(KeyCode::Down) {
-        game.player.direction = Vec2::new(0.0, -1.0);
+    } else if input.pressed(KeyCode::Down) || input.pressed(KeyCode::S) {
         game.player.position.y -= PLAYER_SPEED * time.delta().as_secs_f32();
     }
 
-    if input.pressed(KeyCode::Space) && game.player.shot_clock.elapsed_secs() >= FIRE_INTERVAL {
+    if (input.pressed(KeyCode::Space) || mouse.pressed(MouseButton::Left))
+        && game.player.shot_clock.elapsed_secs() >= FIRE_INTERVAL
+    {
         commands
             .spawn_bundle(SpriteBundle {
                 sprite: Sprite {
@@ -126,6 +134,7 @@ pub fn tick(
                 position: game.player.position,
                 hits_player: false,
                 velocity: BULLET_SPEED * game.player.direction,
+                damage: 50,
             })
             .insert(Collider::cuboid(25.0, 25.0))
             .insert(Sensor);

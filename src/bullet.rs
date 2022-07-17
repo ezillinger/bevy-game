@@ -6,6 +6,7 @@ pub struct Bullet {
     pub hits_player: bool,
     pub position: Vec2,
     pub velocity: Vec2,
+    pub damage: i32,
 }
 
 impl Bullet {
@@ -17,12 +18,12 @@ impl Bullet {
 pub fn tick(
     mut commands: Commands,
     time: Res<Time>,
-    mut bullets: Query<(&mut Bullet, &mut Transform, &Collider)>,
-    enemies: Query<(&mut Enemy, &mut Transform, &Collider, Without<Bullet>)>,
+    mut bullets: Query<(Entity, &mut Bullet, &mut Transform, &Collider)>,
+    mut enemies: Query<(&mut Enemy, &mut Transform, &Collider, Without<Bullet>)>,
     rapier_ctx: Res<RapierContext>,
-    mut game: ResMut<Game>,
+    game: ResMut<Game>,
 ) {
-    for (mut bullet, mut transform, collider) in bullets.iter_mut() {
+    for (bullet_entity, mut bullet, mut transform, collider) in bullets.iter_mut() {
         bullet.update_position(time.as_ref());
         *transform = Transform {
             translation: Vec3::new(bullet.position.x, bullet.position.y, 32.0f32),
@@ -35,9 +36,9 @@ pub fn tick(
             collider,
             QueryFilter::default(),
             |entity| {
-                if let Ok(enemy) = enemies.get(entity) {
-                    game.player.score += enemy.0.point_value;
-                    commands.entity(entity).despawn();
+                if let Ok(mut enemy) = enemies.get_mut(entity) {
+                    enemy.0.health -= bullet.damage;
+                    commands.entity(bullet_entity).despawn();
                 }
                 true
             },

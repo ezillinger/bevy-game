@@ -1,8 +1,7 @@
 use std::time::Duration;
 
-use bevy::{core::Stopwatch, input::mouse::MouseMotion};
-
 use crate::*;
+use bevy::core::Stopwatch;
 
 #[derive(Component)]
 pub struct Player {
@@ -75,8 +74,7 @@ pub fn tick(
     windows: Res<Windows>,
     mut game: ResMut<Game>,
     time: Res<Time>,
-    images: Res<Assets<Image>>,
-    mut transform: Query<&mut Transform>,
+    mut player: Query<(&mut Sprite, &mut Transform), With<Player>>,
 ) {
     const PLAYER_SPEED: f32 = 400.0;
     const BULLET_SPEED: f32 = 4000.0;
@@ -96,8 +94,12 @@ pub fn tick(
 
     if let Some(window) = windows.get_primary() {
         if let Some(mouse_pos) = window.cursor_position() {
-            let world_pos = mouse_pos - Vec2::new(window.width() / 2.0, window.height() / 2.0);
+            let rel_mouse_pos = mouse_pos / Vec2::new(window.width(), window.height());
+
+            let aspect_ratio = window.width() / window.height();
+            let world_pos = (rel_mouse_pos - 0.5) * 2.0 * Vec2::new(5000.0, 5000.0 / aspect_ratio);
             game.player.direction = (world_pos - game.player.position).normalize();
+            game.mouse_world_pos = world_pos;
         }
     }
 
@@ -142,8 +144,15 @@ pub fn tick(
         game.player.shot_clock.reset();
     }
 
-    *transform.get_mut(game.player.id.unwrap()).unwrap() = Transform {
-        translation: Vec3::new(game.player.position.x, game.player.position.y, 32.0f32),
-        ..default()
-    };
+    if let Ok((mut sprite, mut transform)) = player.get_single_mut() {
+        *transform = Transform {
+            translation: Vec3::new(
+                game.player.position.x,
+                game.player.position.y,
+                z_from_y(game.player.position.y),
+            ),
+            ..default()
+        };
+        sprite.flip_x = game.player.direction.x < 0.0;
+    }
 }

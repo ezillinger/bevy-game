@@ -12,6 +12,18 @@
 			"presentation": {
 				"clear": true
 			}
+		},
+		{
+			"type": "shell",
+			"command": "$env:RUST_BACKTRACE=1; cargo test",
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
+			"label": "rust: cargo test"
 		}
 	]
 }

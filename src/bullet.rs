@@ -21,7 +21,6 @@ pub fn tick(
     mut bullets: Query<(Entity, &mut Bullet, &mut Transform, &Collider)>,
     mut enemies: Query<(&mut Enemy, &mut Transform, &Collider, Without<Bullet>)>,
     rapier_ctx: Res<RapierContext>,
-    game: ResMut<Game>,
 ) {
     for (bullet_entity, mut bullet, mut transform, collider) in bullets.iter_mut() {
         bullet.update_position(time.as_ref());

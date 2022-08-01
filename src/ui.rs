@@ -86,18 +86,27 @@ pub fn draw_hud(mut egui_context: ResMut<EguiContext>, game: Res<Game>, windows:
             visuals.selection.bg_fill = egui::Color32::RED;
             ui.label(format!("Score: {:?}", game.player.score));
             ui.add(
-                egui::ProgressBar::new(game.player.health as f32 / game.player.max_health as f32)
-                    .text(format!("{}/{}", game.player.health, game.player.max_health))
-                    .desired_width(100.0)
-                    .animate(false),
+                egui::ProgressBar::new(
+                    game.player.health as f32 / game.player.stats.max_health.value() as f32,
+                )
+                .text(format!(
+                    "{}/{}",
+                    game.player.health,
+                    game.player.stats.max_health.value()
+                ))
+                .desired_width(100.0)
+                .animate(false),
             );
+            ui.label(format!("Wave: {:?}", game.wave));
+            ui.label(format!("Kills: {:?}", game.kills));
 
             let debug = true;
             if debug {
-                if let Some(pos) = windows.get_primary().unwrap().cursor_position() {
-                    ui.label(format!("Mouse: {:?}", pos));
+                if let Some(window) = windows.get_primary() {
+                    ui.label(format!("Mouse: {:?}", window.cursor_position()));
                     ui.label(format!("Mouse World: {:?}", game.mouse_world_pos));
                     ui.label(format!("Mouse Rel: {:?}", game.mouse_rel_pos));
+                    ui.label(format!("Window: {:?}", game.window_size));
                 }
                 ui.label(format!("Player: {:?}", game.player.position));
             }

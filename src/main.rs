@@ -1,6 +1,9 @@
 mod bullet;
 mod enemy;
+mod game;
 mod map;
+mod physics_sprite;
+mod pickup;
 mod player;
 mod prelude;
 mod ui;
@@ -8,12 +11,13 @@ mod ui;
 use std::time::Duration;
 
 use bevy::{
-    asset::{self, LoadState},
-    core::Zeroable,
+    asset::LoadState,
     math::vec2,
     render::{
-        camera::{CameraProjection, ScalingMode},
+        camera::{CameraProjection, CameraRenderGraph, DepthCalculation, ScalingMode},
+        primitives::Frustum,
         texture::ImageSettings,
+        view::VisibleEntities,
     },
 };
 
@@ -24,14 +28,15 @@ use iyes_loopless::prelude::*;
 use bullet::*;
 use enemy::*;
 use map::*;
+use pickup::*;
 use player::*;
 use prelude::*;
 
 #[derive(Default)]
 struct Handles {
     player_tex: Handle<Image>,
-
     map_tex: Handle<Image>,
+    pickup_tex: Handle<Image>,
 
     enemy_tex: Handle<Image>,
     enemy_atlas: Handle<TextureAtlas>,
@@ -52,10 +57,12 @@ enum GameState {
 #[derive(Default)]
 pub struct Game {
     player: Player,
-    map: Map,
     handles: Handles,
     mouse_world_pos: Vec2,
     mouse_rel_pos: Vec2,
+    window_size: Vec2,
+    wave: i32,
+    kills: i32,
 }
 
 fn main() {
@@ -78,9 +85,12 @@ fn main() {
         .add_system_set(
             ConditionSet::new()
                 .run_in_state(GameState::Gameplay)
+                .with_system(player::tick_cursor)
                 .with_system(player::tick)
+                .with_system(pickup::tick)
                 .with_system(enemy::tick)
                 .with_system(bullet::tick)
+                .with_system(game::spawn_waves)
                 .into(),
         )
         .run();
@@ -97,6 +107,7 @@ fn wait_for_assets(
     if LoadState::Loaded == asset_server.get_load_state(&game.handles.enemy_tex)
         && LoadState::Loaded == asset_server.get_load_state(&game.handles.player_tex)
         && LoadState::Loaded == asset_server.get_load_state(&game.handles.map_tex)
+        && LoadState::Loaded == asset_server.get_load_state(&game.handles.pickup_tex)
     {
         println!("Textures loaded. Building texture atlases");
         {
@@ -122,48 +133,45 @@ fn reset(mut commands: Commands, mut game: ResMut<Game>, enemies: Query<(Entity,
         ..default()
     };
 
+    game.wave = 0;
+    game.kills = 0;
+    game.player.score = 0;
+
     //enemies
     for e in enemies.iter() {
         commands.entity(e.0).despawn();
-    }
-
-    for _ in 0..10 {
-        commands.spawn_bundle(EnemyBundle::new(
-            rand_vec2(),
-            game.handles.enemy_atlas.clone(),
-            game.handles.enemy_animation.clone(),
-        ));
     }
 
     commands.insert_resource(NextState(GameState::Gameplay));
 }
 
 fn make_camera() -> Camera2dBundle {
+    let far = 1000.0;
     // we want 0 to be "closest" and +far to be "farthest" in 2d, so we offset
     // the camera's translation by far and use a right handed coordinate system
-    let far = 1000.0;
-    let orthographic_projection = OrthographicProjection {
+    let mut projection = OrthographicProjection {
         far,
-        depth_calculation: bevy::render::camera::DepthCalculation::ZDifference,
+        depth_calculation: DepthCalculation::ZDifference,
         scaling_mode: ScalingMode::FixedVertical(MAP_DIMS.y),
-        scale: 1.0,
         ..Default::default()
     };
     let transform = Transform::from_xyz(0.0, 0.0, far - 0.1);
-    let view_projection =
-        orthographic_projection.get_projection_matrix() * transform.compute_matrix().inverse();
-    let frustum = bevy::render::primitives::Frustum::from_view_projection(
+    let view_projection = projection.get_projection_matrix() * transform.compute_matrix().inverse();
+    let frustum = Frustum::from_view_projection(
         &view_projection,
         &transform.translation,
         &transform.back(),
-        orthographic_projection.far,
+        projection.far(),
     );
     Camera2dBundle {
-        camera: Camera { ..default() },
-        frustum: frustum,
-        projection: orthographic_projection,
-        transform: transform,
-        ..default()
+        camera_render_graph: CameraRenderGraph::new(bevy::core_pipeline::core_2d::graph::NAME),
+        projection,
+        visible_entities: VisibleEntities::default(),
+        frustum,
+        transform,
+        global_transform: Default::default(),
+        camera: Camera::default(),
+        camera_2d: Camera2d::default(),
     }
 }
 
@@ -182,6 +190,7 @@ fn setup(
 
     // load assets
     game.handles.map_tex = asset_server.load("../../../assets/map.png");
+    game.handles.pickup_tex = asset_server.load("../../../assets/pickup.png");
     game.handles.enemy_tex = asset_server.load("../../../assets/creature-sheet.png");
     game.handles.player_tex = asset_server.load("../../../assets/player.png");
 
@@ -199,4 +208,15 @@ fn setup(
             .spawn_bundle(PlayerBundle::new(game.handles.player_tex.clone()))
             .id(),
     );
+
+    commands.spawn_bundle(CursorBundle {
+        sprite: SpriteBundle {
+            sprite: Sprite {
+                custom_size: Some(vec2(10.0, 10.0)),
+                ..default()
+            },
+            ..default()
+        },
+        ..default()
+    });
 }

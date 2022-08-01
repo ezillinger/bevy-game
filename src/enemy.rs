@@ -15,7 +15,7 @@ pub struct Enemy {
     pub radius: f32,
     pub damage: f32,
 
-    pub health: i32,
+    pub health: f32,
     pub max_health: i32,
 
     pub hit_interval: Duration,
@@ -50,9 +50,10 @@ impl EnemyBundle {
                 radius: 1.0,
                 damage: 10.0,
                 point_value: 100,
-                health: 100,
+                health: 100.0,
+                max_health: 100,
                 hit_interval: Duration::from_millis(300),
-                speed: 4.0,
+                speed: 2.0,
                 ..default()
             },
             collider: Collider::capsule_y(ENEMY_DIMS.y / 5.0, ENEMY_DIMS.x / 4.0),
@@ -84,17 +85,21 @@ pub fn tick(
     rapier_ctx: Res<RapierContext>,
 ) {
     for (entity, mut enemy, mut transform, collider, mut sprite) in enemies.iter_mut() {
-        if enemy.health <= 0 {
+        if enemy.health <= 0.0 {
             commands.entity(entity).despawn();
         }
 
         enemy.hit_timer.tick(time.delta());
 
         let player_dir = (game.player.position - enemy.position).normalize();
-        let new_pos = enemy.position + rand_vec2() / 100.0 + player_dir * enemy.speed;
+        let player_dist = (game.player.position - enemy.position).length();
+        enemy.direction = (25.5 * enemy.direction
+            + (player_dist / 700.0) * 10.5 * rand_norm_vec2()
+            + (1.0 - player_dist / 700.0) * 5.25 * player_dir)
+            .normalize();
+        let new_pos = enemy.position + enemy.direction * enemy.speed;
 
-        enemy.direction = player_dir;
-        enemy.position = new_pos;
+        enemy.position = clamp_position(&new_pos);
 
         sprite.flip_x = enemy.direction.x < 0.0;
 
@@ -115,7 +120,7 @@ pub fn tick(
                 QueryFilter::default(),
                 |entity| {
                     if entity.id() == game.player.id.unwrap().id() {
-                        game.player.health -= enemy.damage as i32;
+                        game.player.health -= enemy.damage;
                         enemy.hit_timer.reset();
                         return false;
                     }

@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use glam::vec3;
+use bevy_rapier2d::na::clamp;
 
 use crate::*;
 
@@ -17,6 +15,13 @@ pub struct MapBundle {
 
 pub const MAP_DIMS: Vec2 = vec2(1200.0, 800.0);
 
+pub fn clamp_position(pos: &Vec2) -> Vec2 {
+    return vec2(
+        clamp(pos.x, -MAP_DIMS.x / 2.2, MAP_DIMS.x / 2.2),
+        clamp(pos.y, -MAP_DIMS.y / 2.5, MAP_DIMS.y / 2.3),
+    );
+}
+
 impl MapBundle {
     pub fn new(pos: Vec2, tex: Handle<Image>) -> Self {
         return Self {
@@ -28,7 +33,7 @@ impl MapBundle {
                     ..default()
                 },
                 transform: Transform {
-                    translation: vec3(0.0, 0.0, 10.0),
+                    translation: pos.extend(10.0),
                     ..default()
                 },
                 ..default()

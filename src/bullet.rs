@@ -6,7 +6,7 @@ pub struct Bullet {
     pub hits_player: bool,
     pub position: Vec2,
     pub velocity: Vec2,
-    pub damage: i32,
+    pub damage: f32,
     pub radius: f32,
 }
 
@@ -50,6 +50,7 @@ impl BulletBundle {
 pub fn tick(
     mut commands: Commands,
     time: Res<Time>,
+    mut game: ResMut<Game>,
     mut bullets: Query<(Entity, &mut Bullet, &mut Transform, &Collider)>,
     mut enemies: Query<(&mut Enemy, &mut Transform, &Collider, Without<Bullet>)>,
     rapier_ctx: Res<RapierContext>,
@@ -69,7 +70,10 @@ pub fn tick(
             |entity| {
                 if let Ok(mut enemy) = enemies.get_mut(entity) {
                     enemy.0.health -= bullet.damage;
+                    enemy.0.direction = bullet.velocity.normalize();
                     commands.entity(bullet_entity).despawn();
+                    game.kills += 1;
+                    game.player.score += enemy.0.max_health;
                 }
                 true
             },

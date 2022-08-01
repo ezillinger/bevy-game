@@ -2,34 +2,77 @@ use std::time::Duration;
 
 use crate::*;
 use bevy::time::Stopwatch;
+use map::clamp_position;
+use physics_sprite::PhysicsSpriteBundle;
 
 const PLAYER_DIMS: Vec2 = vec2(40.0, 45.0);
+
+pub struct Stat {
+    pub base: f32,
+
+    pub multiply: f32,
+    pub add: f32,
+}
+
+impl Stat {
+    fn new(base: f32) -> Stat {
+        Stat {
+            base: base,
+            add: 0.0,
+            multiply: 1.0,
+        }
+    }
+
+    pub fn value(&self) -> f32 {
+        self.base * self.multiply + self.add
+    }
+}
+
+#[derive(Component)]
+pub struct Stats {
+    pub max_health: Stat,
+    pub shot_duration: Stat,
+    pub shot_speed: Stat,
+    pub shot_size: Stat,
+    pub fire_interval: Stat,
+    pub damage: Stat,
+}
+
+impl Stats {
+    fn new() -> Stats {
+        Stats {
+            damage: Stat::new(60.0),
+            max_health: Stat::new(100.0),
+            fire_interval: Stat::new(0.5),
+            shot_speed: Stat::new(200.0),
+            shot_duration: Stat::new(1.0),
+            shot_size: Stat::new(10.0),
+        }
+    }
+}
 
 #[derive(Component)]
 pub struct Player {
     pub position: Vec2,
     pub direction: Vec2,
-    pub radius: f32,
     pub id: Option<Entity>,
-    pub bullets: Vec<Entity>,
     pub shot_clock: Stopwatch,
-    pub health: i32,
-    pub max_health: i32,
     pub score: i32,
+    pub health: f32,
+
+    pub stats: Stats,
 }
 
 impl Default for Player {
     fn default() -> Self {
         return Player {
-            health: 100,
-            max_health: 100,
             position: Vec2::ZERO,
-            radius: 1.0,
-            bullets: Vec::<Entity>::new(),
             shot_clock: Stopwatch::new(),
             direction: Vec2::new(1.0, 0.0),
+            health: 100.0,
             score: 0,
             id: None,
+            stats: Stats::new(),
         };
     }
 }
@@ -37,27 +80,30 @@ impl Default for Player {
 #[derive(Default, Bundle)]
 pub struct PlayerBundle {
     player: Player,
-    collider: Collider,
-    sensor: Sensor,
 
     #[bundle]
-    sprite: SpriteBundle,
+    sprite: PhysicsSpriteBundle,
+}
+
+#[derive(Default, Component)]
+pub struct Cursor {
+    screen_pos: Vec2,
+    world_pos: Vec2,
+}
+
+#[derive(Default, Bundle)]
+pub struct CursorBundle {
+    pub cursor: Cursor,
+
+    #[bundle]
+    pub sprite: SpriteBundle,
 }
 
 impl PlayerBundle {
     pub fn new(tex: Handle<Image>) -> PlayerBundle {
         return PlayerBundle {
             player: Player::default(),
-            collider: Collider::capsule_y(PLAYER_DIMS.y / 4.0, PLAYER_DIMS.x / 4.0),
-            sensor: Sensor,
-            sprite: SpriteBundle {
-                texture: tex,
-                sprite: Sprite {
-                    custom_size: Some(PLAYER_DIMS),
-                    ..default()
-                },
-                ..default()
-            },
+            sprite: PhysicsSpriteBundle::new(&PLAYER_DIMS, &Vec2::ZERO, tex),
         };
     }
 }
@@ -68,41 +114,57 @@ impl Player {
     }
 }
 
+pub fn tick_cursor(
+    mut game: ResMut<Game>,
+    windows: Res<Windows>,
+    camera: Query<&OrthographicProjection, (With<Camera>, Without<Cursor>)>,
+    mut cursor: Query<(&mut Transform, &mut Cursor)>,
+) {
+    if let Ok(projection) = camera.get_single() {
+        if let Some(window) = windows.get_primary() {
+            game.window_size = vec2(window.width(), window.height());
+            if let Some(mouse_pos) = window.cursor_position() {
+                if let Ok((mut transform, mut cursor)) = cursor.get_single_mut() {
+                    cursor.screen_pos = mouse_pos;
+                    let world_pos = vec2(
+                        lerp(projection.left, projection.right, game.mouse_rel_pos.x),
+                        lerp(projection.bottom, projection.top, game.mouse_rel_pos.y),
+                    );
+                    game.mouse_rel_pos = cursor.screen_pos / game.window_size;
+                    cursor.world_pos = world_pos;
+                    transform.translation = world_pos.extend(33.0);
+                }
+            }
+        }
+    }
+}
+
 pub fn tick(
     mut commands: Commands,
     input: Res<Input<KeyCode>>,
     mouse: Res<Input<MouseButton>>,
-    windows: Res<Windows>,
     mut game: ResMut<Game>,
     time: Res<Time>,
     mut player: Query<(&mut Sprite, &mut Transform), With<Player>>,
+    cursor: Query<&Cursor>,
 ) {
     const PLAYER_SPEED: f32 = 400.0;
-    const BULLET_SPEED: f32 = 400.0;
-    const BULLET_SIZE: f32 = 10.0;
-    const FIRE_INTERVAL: f32 = 0.25;
 
     if input.pressed(KeyCode::Escape) {
         commands.insert_resource(NextState(GameState::Paused));
         return;
     }
 
-    if game.player.health <= 0 {
+    if game.player.health <= 0.0 {
         commands.insert_resource(NextState(GameState::GameOver));
         return;
     }
 
     game.player.tick_cooldowns(time.delta());
 
-    if let Some(window) = windows.get_primary() {
-        if let Some(mouse_pos) = window.cursor_position() {
-            game.mouse_rel_pos = mouse_pos / Vec2::new(window.width(), window.height());
-
-            let aspect_ratio = window.width() / window.height();
-            let world_pos = (game.mouse_rel_pos - 0.5) * Vec2::new(5000.0, aspect_ratio / 5000.0);
-            game.player.direction = (world_pos - game.player.position).normalize();
-            game.mouse_world_pos = world_pos;
-        }
+    if let Ok(cursor) = cursor.get_single() {
+        game.player.direction = (cursor.world_pos - game.player.position).normalize();
+        game.mouse_world_pos = cursor.world_pos;
     }
 
     if input.pressed(KeyCode::Left) || input.pressed(KeyCode::A) {
@@ -117,16 +179,18 @@ pub fn tick(
         game.player.position.y -= PLAYER_SPEED * time.delta().as_secs_f32();
     }
 
+    game.player.position = clamp_position(&game.player.position);
+
     if (input.pressed(KeyCode::Space) || mouse.pressed(MouseButton::Left))
-        && game.player.shot_clock.elapsed_secs() >= FIRE_INTERVAL
+        && game.player.shot_clock.elapsed_secs() >= game.player.stats.fire_interval.value()
     {
         commands.spawn_bundle(BulletBundle::new(Bullet {
             shooter: Some(game.player.id.unwrap()),
             position: game.player.position,
             hits_player: false,
-            velocity: BULLET_SPEED * game.player.direction,
-            damage: 150,
-            radius: BULLET_SIZE,
+            velocity: game.player.stats.shot_speed.value() * game.player.direction,
+            damage: game.player.stats.damage.value(),
+            radius: game.player.stats.shot_size.value(),
         }));
 
         game.player.shot_clock.reset();

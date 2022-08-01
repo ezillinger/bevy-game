@@ -25,9 +25,17 @@ fn test_lerp() {
     }
 }
 
-pub fn rand_vec2() -> Vec2 {
+pub fn rand_pos_vec2() -> Vec2 {
     return Vec2::new(
-        rand::thread_rng().gen_range(-1000.0..1000.0),
-        rand::thread_rng().gen_range(-1000.0..1000.0),
+        rand::thread_rng().gen_range(0.0..1.0),
+        rand::thread_rng().gen_range(0.0..1.0),
     );
+}
+
+pub fn rand_norm_vec2() -> Vec2 {
+    return Vec2::new(
+        rand::thread_rng().gen_range(-1.0..1.0),
+        rand::thread_rng().gen_range(-1.0..1.0),
+    )
+    .normalize();
 }

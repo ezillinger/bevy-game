@@ -1,5 +1,6 @@
 mod bullet;
 mod enemy;
+mod map;
 mod player;
 mod prelude;
 mod ui;
@@ -8,23 +9,29 @@ use std::time::Duration;
 
 use bevy::{
     asset::{self, LoadState},
+    core::Zeroable,
     math::vec2,
-    render::camera::{Camera2d, CameraProjection, ScalingMode},
+    render::{
+        camera::{CameraProjection, ScalingMode},
+        texture::ImageSettings,
+    },
 };
-use player::*;
-use prelude::*;
-
-use bevy_egui::{EguiPlugin, EguiSettings};
-
-use bullet::Bullet;
-use enemy::{Enemy, EnemyBundle};
-use iyes_loopless::prelude::*;
 
 use benimator::*;
+use bevy_egui::{EguiPlugin, EguiSettings};
+use iyes_loopless::prelude::*;
+
+use bullet::*;
+use enemy::*;
+use map::*;
+use player::*;
+use prelude::*;
 
 #[derive(Default)]
 struct Handles {
     player_tex: Handle<Image>,
+
+    map_tex: Handle<Image>,
 
     enemy_tex: Handle<Image>,
     enemy_atlas: Handle<TextureAtlas>,
@@ -45,17 +52,20 @@ enum GameState {
 #[derive(Default)]
 pub struct Game {
     player: Player,
+    map: Map,
     handles: Handles,
     mouse_world_pos: Vec2,
+    mouse_rel_pos: Vec2,
 }
 
 fn main() {
     App::new()
         .init_resource::<Game>()
+        .insert_resource(ImageSettings::default_nearest())
         .add_loopless_state(GameState::Init)
         .add_plugins(DefaultPlugins)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        //.add_plugin(RapierDebugRenderPlugin::default())
+        .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(EguiPlugin)
         .add_plugin(benimator::AnimationPlugin::default())
         .add_startup_system(setup)
@@ -86,17 +96,22 @@ fn wait_for_assets(
     println!("Waiting for assets");
     if LoadState::Loaded == asset_server.get_load_state(&game.handles.enemy_tex)
         && LoadState::Loaded == asset_server.get_load_state(&game.handles.player_tex)
+        && LoadState::Loaded == asset_server.get_load_state(&game.handles.map_tex)
     {
-        println!("Textures loaded");
-        let image_size = images.get(&game.handles.enemy_tex).unwrap().size();
-        let atlas = TextureAtlas::from_grid(
-            game.handles.enemy_tex.clone(),
-            vec2(image_size.x / 4.0, image_size.y),
-            4,
-            1,
-        );
-        game.handles.enemy_atlas = atlases.add(atlas);
+        println!("Textures loaded. Building texture atlases");
+        {
+            // enemy
+            let image_size = images.get(&game.handles.enemy_tex).unwrap().size();
+            let atlas = TextureAtlas::from_grid(
+                game.handles.enemy_tex.clone(),
+                vec2(image_size.x / 4.0, image_size.y),
+                4,
+                1,
+            );
+            game.handles.enemy_atlas = atlases.add(atlas);
+        }
 
+        println!("Atlas Building Complete");
         commands.insert_resource(NextState(GameState::Menu));
     }
 }
@@ -123,15 +138,15 @@ fn reset(mut commands: Commands, mut game: ResMut<Game>, enemies: Query<(Entity,
     commands.insert_resource(NextState(GameState::Gameplay));
 }
 
-fn make_camera() -> OrthographicCameraBundle<Camera2d> {
+fn make_camera() -> Camera2dBundle {
     // we want 0 to be "closest" and +far to be "farthest" in 2d, so we offset
     // the camera's translation by far and use a right handed coordinate system
     let far = 1000.0;
     let orthographic_projection = OrthographicProjection {
         far,
         depth_calculation: bevy::render::camera::DepthCalculation::ZDifference,
-        scaling_mode: ScalingMode::FixedHorizontal,
-        scale: 5000.0,
+        scaling_mode: ScalingMode::FixedVertical(MAP_DIMS.y),
+        scale: 1.0,
         ..Default::default()
     };
     let transform = Transform::from_xyz(0.0, 0.0, far - 0.1);
@@ -143,19 +158,12 @@ fn make_camera() -> OrthographicCameraBundle<Camera2d> {
         &transform.back(),
         orthographic_projection.far,
     );
-    let global_transform = GlobalTransform { ..default() };
-    OrthographicCameraBundle {
-        camera: Camera {
-            near: orthographic_projection.near,
-            far: orthographic_projection.far,
-            ..Default::default()
-        },
-        orthographic_projection,
-        visible_entities: bevy::render::view::VisibleEntities::default(),
-        frustum,
-        transform,
-        global_transform,
-        marker: Camera2d,
+    Camera2dBundle {
+        camera: Camera { ..default() },
+        frustum: frustum,
+        projection: orthographic_projection,
+        transform: transform,
+        ..default()
     }
 }
 
@@ -172,6 +180,8 @@ fn setup(
     // camera
     commands.spawn_bundle(make_camera());
 
+    // load assets
+    game.handles.map_tex = asset_server.load("../../../assets/map.png");
     game.handles.enemy_tex = asset_server.load("../../../assets/creature-sheet.png");
     game.handles.player_tex = asset_server.load("../../../assets/player.png");
 
@@ -180,7 +190,13 @@ fn setup(
         Duration::from_millis(250),
     ));
 
+    // map
+    commands.spawn_bundle(MapBundle::new(Vec2::ZERO, game.handles.map_tex.clone()));
+
     //player
-    let tex = &game.handles.player_tex;
-    game.player.id = Some(commands.spawn_bundle(PlayerBundle::new(tex.clone())).id());
+    game.player.id = Some(
+        commands
+            .spawn_bundle(PlayerBundle::new(game.handles.player_tex.clone()))
+            .id(),
+    );
 }

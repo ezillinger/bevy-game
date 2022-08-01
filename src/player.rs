@@ -1,7 +1,9 @@
 use std::time::Duration;
 
 use crate::*;
-use bevy::core::Stopwatch;
+use bevy::time::Stopwatch;
+
+const PLAYER_DIMS: Vec2 = vec2(40.0, 45.0);
 
 #[derive(Component)]
 pub struct Player {
@@ -46,13 +48,12 @@ impl PlayerBundle {
     pub fn new(tex: Handle<Image>) -> PlayerBundle {
         return PlayerBundle {
             player: Player::default(),
-            collider: Collider::capsule_y(40.0, 40.0),
+            collider: Collider::capsule_y(PLAYER_DIMS.y / 4.0, PLAYER_DIMS.x / 4.0),
             sensor: Sensor,
             sprite: SpriteBundle {
                 texture: tex,
                 sprite: Sprite {
-                    //color: Color::rgb(0.5, 0.5, 0.5),
-                    custom_size: Some(Vec2::new(150.0, 160.0)),
+                    custom_size: Some(PLAYER_DIMS),
                     ..default()
                 },
                 ..default()
@@ -77,7 +78,8 @@ pub fn tick(
     mut player: Query<(&mut Sprite, &mut Transform), With<Player>>,
 ) {
     const PLAYER_SPEED: f32 = 400.0;
-    const BULLET_SPEED: f32 = 4000.0;
+    const BULLET_SPEED: f32 = 400.0;
+    const BULLET_SIZE: f32 = 10.0;
     const FIRE_INTERVAL: f32 = 0.25;
 
     if input.pressed(KeyCode::Escape) {
@@ -94,10 +96,10 @@ pub fn tick(
 
     if let Some(window) = windows.get_primary() {
         if let Some(mouse_pos) = window.cursor_position() {
-            let rel_mouse_pos = mouse_pos / Vec2::new(window.width(), window.height());
+            game.mouse_rel_pos = mouse_pos / Vec2::new(window.width(), window.height());
 
             let aspect_ratio = window.width() / window.height();
-            let world_pos = (rel_mouse_pos - 0.5) * 2.0 * Vec2::new(5000.0, 5000.0 / aspect_ratio);
+            let world_pos = (game.mouse_rel_pos - 0.5) * Vec2::new(5000.0, aspect_ratio / 5000.0);
             game.player.direction = (world_pos - game.player.position).normalize();
             game.mouse_world_pos = world_pos;
         }
@@ -118,28 +120,14 @@ pub fn tick(
     if (input.pressed(KeyCode::Space) || mouse.pressed(MouseButton::Left))
         && game.player.shot_clock.elapsed_secs() >= FIRE_INTERVAL
     {
-        commands
-            .spawn_bundle(SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgb(0.5, 0.5, 0.5),
-                    custom_size: Some(Vec2::new(50.0, 50.0)),
-                    ..default()
-                },
-                transform: Transform {
-                    translation: game.player.position.extend(32.0f32),
-                    ..default()
-                },
-                ..default()
-            })
-            .insert(Bullet {
-                shooter: game.player.id.unwrap(),
-                position: game.player.position,
-                hits_player: false,
-                velocity: BULLET_SPEED * game.player.direction,
-                damage: 50,
-            })
-            .insert(Collider::cuboid(25.0, 25.0))
-            .insert(Sensor);
+        commands.spawn_bundle(BulletBundle::new(Bullet {
+            shooter: Some(game.player.id.unwrap()),
+            position: game.player.position,
+            hits_player: false,
+            velocity: BULLET_SPEED * game.player.direction,
+            damage: 150,
+            radius: BULLET_SIZE,
+        }));
 
         game.player.shot_clock.reset();
     }

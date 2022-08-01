@@ -1,17 +1,49 @@
 use crate::*;
 
-#[derive(Component)]
+#[derive(Component, Default)]
 pub struct Bullet {
-    pub shooter: Entity,
+    pub shooter: Option<Entity>,
     pub hits_player: bool,
     pub position: Vec2,
     pub velocity: Vec2,
     pub damage: i32,
+    pub radius: f32,
 }
 
 impl Bullet {
     pub fn update_position(&mut self, delta: &Time) {
         self.position += self.velocity * delta.delta_seconds();
+    }
+}
+
+#[derive(Default, Bundle)]
+pub struct BulletBundle {
+    bullet: Bullet,
+    collider: Collider,
+    sensor: Sensor,
+    #[bundle]
+    sprite: SpriteBundle,
+}
+
+impl BulletBundle {
+    pub fn new(bullet: Bullet) -> Self {
+        BulletBundle {
+            collider: Collider::ball(bullet.radius),
+            sensor: Sensor,
+            sprite: SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgb(0.5, 0.5, 0.5),
+                    custom_size: Some(Vec2::ONE * 2.0 * bullet.radius),
+                    ..default()
+                },
+                transform: Transform {
+                    translation: bullet.position.extend(32.0f32),
+                    ..default()
+                },
+                ..default()
+            },
+            bullet: bullet,
+        }
     }
 }
 

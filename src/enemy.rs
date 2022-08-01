@@ -1,9 +1,11 @@
 use std::time::Duration;
 
 use benimator::Play;
-use bevy::{core::Stopwatch, math::vec3};
+use bevy::time::Stopwatch;
 
 use crate::*;
+
+const ENEMY_DIMS: Vec2 = vec2(70.0, 90.0);
 
 #[derive(Component, Default)]
 pub struct Enemy {
@@ -50,14 +52,14 @@ impl EnemyBundle {
                 point_value: 100,
                 health: 100,
                 hit_interval: Duration::from_millis(300),
-                speed: 10.0,
+                speed: 4.0,
                 ..default()
             },
-            collider: Collider::capsule_y(50.0, 50.0),
+            collider: Collider::capsule_y(ENEMY_DIMS.y / 5.0, ENEMY_DIMS.x / 4.0),
             sprite: SpriteSheetBundle {
                 texture_atlas: tex,
                 sprite: TextureAtlasSprite {
-                    custom_size: Some(vec2(200.0, 200.0)),
+                    custom_size: Some(ENEMY_DIMS),
                     ..default()
                 },
                 ..default()

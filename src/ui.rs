@@ -97,6 +97,7 @@ pub fn draw_hud(mut egui_context: ResMut<EguiContext>, game: Res<Game>, windows:
                 if let Some(pos) = windows.get_primary().unwrap().cursor_position() {
                     ui.label(format!("Mouse: {:?}", pos));
                     ui.label(format!("Mouse World: {:?}", game.mouse_world_pos));
+                    ui.label(format!("Mouse Rel: {:?}", game.mouse_rel_pos));
                 }
                 ui.label(format!("Player: {:?}", game.player.position));
             }

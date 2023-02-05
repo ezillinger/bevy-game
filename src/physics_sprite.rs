@@ -1,3 +1,5 @@
+use bevy::sprite::Mesh2dHandle;
+
 use crate::*;
 
 #[derive(Component, Default)]
@@ -9,24 +11,26 @@ pub struct PhysicsSpriteBundle {
     pub collider: Collider,
     pub sensor: Sensor,
 
+    //pub sprite: SpriteBundle,
+
     #[bundle]
-    pub sprite: SpriteBundle,
+    pub mesh: ColorMesh2dBundle,
 }
 
+
 impl PhysicsSpriteBundle {
-    pub fn new(dims: &Vec2, pos: &Vec2, tex: Handle<Image>) -> PhysicsSpriteBundle {
+    pub fn new(dims: &Vec2, pos: &Vec2, material: Handle<ColorMaterial>, mesh: Mesh2dHandle) -> PhysicsSpriteBundle {
         return PhysicsSpriteBundle {
+            
             collider: Collider::capsule_y(dims.y / 4.0, dims.x / 4.0),
             sensor: Sensor,
-            sprite: SpriteBundle {
-                texture: tex,
-                sprite: Sprite {
-                    custom_size: Some(dims.clone()),
-                    ..default()
-                },
-                ..default()
-            },
             dims: Dims(dims.clone()),
+            mesh: ColorMesh2dBundle {
+                material: material,
+                mesh: mesh,
+                transform: Transform::from_translation(pos.extend(0.0)),
+                ..Default::default()
+            },
         };
     }
 }

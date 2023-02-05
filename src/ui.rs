@@ -73,7 +73,7 @@ pub fn draw_game_over(
         });
 }
 
-pub fn draw_hud(mut egui_context: ResMut<EguiContext>, game: Res<Game>, windows: Res<Windows>) {
+pub fn draw_hud(mut egui_context: ResMut<EguiContext>, game: Res<Game>, windows: Res<Windows>, mut bloom_settings: Query<&mut BloomSettings>,) {
     egui::Area::new("hud")
         .anchor(egui::Align2::LEFT_TOP, [10.0, 10.0])
         .show(egui_context.ctx_mut(), |ui| {
@@ -107,6 +107,13 @@ pub fn draw_hud(mut egui_context: ResMut<EguiContext>, game: Res<Game>, windows:
                     ui.label(format!("Mouse World: {:?}", game.mouse_world_pos));
                     ui.label(format!("Mouse Rel: {:?}", game.mouse_rel_pos));
                     ui.label(format!("Window: {:?}", game.window_size));
+
+                    let mut bloom_settings = bloom_settings.single_mut();
+
+                    ui.add(egui::Slider::new(&mut bloom_settings.knee, 0.0..=2.0).text("Knee"));
+                    ui.add(egui::Slider::new(&mut bloom_settings.threshold, 0.0..=2.0).text("Threshold"));
+                    ui.add(egui::Slider::new(&mut bloom_settings.intensity, 0.0..=2.0).text("Intensity"));
+                    ui.add(egui::Slider::new(&mut bloom_settings.scale, 0.0..=2.0).text("Scale"));
                 }
                 ui.label(format!("Player: {:?}", game.player.position));
             }

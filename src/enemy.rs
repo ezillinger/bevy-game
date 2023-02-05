@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use benimator::Play;
 use bevy::time::Stopwatch;
 
 use crate::*;
@@ -30,8 +29,6 @@ pub struct EnemyBundle {
     enemy: Enemy,
     collider: Collider,
     sensor: Sensor,
-    animation: Handle<SpriteSheetAnimation>,
-    play: Play,
 
     #[bundle]
     sprite: SpriteSheetBundle,
@@ -41,7 +38,6 @@ impl EnemyBundle {
     pub fn new(
         pos: Vec2,
         tex: Handle<TextureAtlas>,
-        animation: Handle<SpriteSheetAnimation>,
     ) -> Self {
         return Self {
             enemy: Enemy {
@@ -65,7 +61,6 @@ impl EnemyBundle {
                 },
                 ..default()
             },
-            animation: animation,
             ..default()
         };
     }
@@ -119,7 +114,7 @@ pub fn tick(
                 collider,
                 QueryFilter::default(),
                 |entity| {
-                    if entity.id() == game.player.id.unwrap().id() {
+                    if entity == game.player.id.unwrap() {
                         game.player.health -= enemy.damage;
                         enemy.hit_timer.reset();
                         return false;

@@ -10,7 +10,7 @@ edition = "2021"
 bevy = "0.9.1"
 
 bevy_rapier2d = { version="0.19", features=["debug-render"] }
-bevy_egui = "0.17"
+bevy_egui = "0.19"
 iyes_loopless = "0.9"
 
 rand = "0.8.5" 

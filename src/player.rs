@@ -1,7 +1,8 @@
-use std::time::Duration;
+use std::{time::Duration, f32::consts::PI};
 
 use crate::*;
-use bevy::time::Stopwatch;
+use bevy::{time::Stopwatch, sprite::Mesh2dHandle};
+use bevy_rapier2d::na::Rotation2;
 use map::clamp_position;
 use physics_sprite::PhysicsSpriteBundle;
 
@@ -44,7 +45,7 @@ impl Stats {
             damage: Stat::new(60.0),
             max_health: Stat::new(100.0),
             fire_interval: Stat::new(0.5),
-            shot_speed: Stat::new(200.0),
+            shot_speed: Stat::new(500.0),
             shot_duration: Stat::new(1.0),
             shot_size: Stat::new(10.0),
         }
@@ -100,10 +101,10 @@ pub struct CursorBundle {
 }
 
 impl PlayerBundle {
-    pub fn new(tex: Handle<Image>) -> PlayerBundle {
+    pub fn new(material: Handle<ColorMaterial>, mesh: Mesh2dHandle) -> PlayerBundle {
         return PlayerBundle {
             player: Player::default(),
-            sprite: PhysicsSpriteBundle::new(&PLAYER_DIMS, &Vec2::ZERO, tex),
+            sprite: PhysicsSpriteBundle::new(&PLAYER_DIMS, &Vec2::ZERO, material, mesh),
         };
     }
 }
@@ -139,13 +140,17 @@ pub fn tick_cursor(
     }
 }
 
+pub fn make_mesh() -> Mesh {
+    return shape::RegularPolygon::new(30.0, 3).into();
+}
+
 pub fn tick(
     mut commands: Commands,
     input: Res<Input<KeyCode>>,
     mouse: Res<Input<MouseButton>>,
     mut game: ResMut<Game>,
     time: Res<Time>,
-    mut player: Query<(&mut Sprite, &mut Transform), With<Player>>,
+    mut player: Query<(&mut Mesh2dHandle, &mut Transform), With<Player>>,
     cursor: Query<&Cursor>,
 ) {
     const PLAYER_SPEED: f32 = 400.0;
@@ -184,18 +189,20 @@ pub fn tick(
     if (input.pressed(KeyCode::Space) || mouse.pressed(MouseButton::Left))
         && game.player.shot_clock.elapsed_secs() >= game.player.stats.fire_interval.value()
     {
-        commands.spawn_bundle(BulletBundle::new(Bullet {
+        let velocity = if input.pressed(KeyCode::LShift) { game.player.stats.shot_speed.value() * 10.0 } else { game.player.stats.shot_speed.value() };
+        commands.spawn(BulletBundle::new(Bullet {
             shooter: Some(game.player.id.unwrap()),
             position: game.player.position,
             hits_player: false,
-            velocity: game.player.stats.shot_speed.value() * game.player.direction,
+            velocity: velocity * game.player.direction,
             damage: game.player.stats.damage.value(),
             radius: game.player.stats.shot_size.value(),
-        }));
+        }, game.handles.bullet_mesh.clone()));
 
         game.player.shot_clock.reset();
     }
 
+    let angle = game.player.direction.y.atan2(game.player.direction.x);
     if let Ok((mut sprite, mut transform)) = player.get_single_mut() {
         *transform = Transform {
             translation: Vec3::new(
@@ -203,8 +210,9 @@ pub fn tick(
                 game.player.position.y,
                 z_from_y(game.player.position.y),
             ),
+            rotation: Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), angle - PI/2.0),
             ..default()
         };
-        sprite.flip_x = game.player.direction.x < 0.0;
+        // sprite.flip_x = game.player.direction.x < 0.0;
     }
 }

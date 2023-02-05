@@ -12,16 +12,18 @@ use std::time::Duration;
 
 use bevy::{
     asset::LoadState,
+    core_pipeline::{
+        bloom::BloomSettings, clear_color::ClearColorConfig, tonemapping::Tonemapping,
+    },
     math::vec2,
     render::{
-        camera::{CameraProjection, CameraRenderGraph, DepthCalculation, ScalingMode},
+        camera::{CameraProjection, CameraRenderGraph, RenderTarget, ScalingMode},
         primitives::Frustum,
-        texture::ImageSettings,
         view::VisibleEntities,
     },
+    sprite::Mesh2dHandle,
 };
 
-use benimator::*;
 use bevy_egui::{EguiPlugin, EguiSettings};
 use iyes_loopless::prelude::*;
 
@@ -35,12 +37,17 @@ use prelude::*;
 #[derive(Default)]
 struct Handles {
     player_tex: Handle<Image>,
-    map_tex: Handle<Image>,
+    player_mesh: Mesh2dHandle,
+
     pickup_tex: Handle<Image>,
+    pickup_mesh: Mesh2dHandle,
+    bullet_mesh: Mesh2dHandle,
 
     enemy_tex: Handle<Image>,
     enemy_atlas: Handle<TextureAtlas>,
-    enemy_animation: Handle<SpriteSheetAnimation>,
+    enemy_mesh: Mesh2dHandle,
+
+    map_tex: Handle<Image>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default)]
@@ -54,7 +61,7 @@ enum GameState {
     Reset,
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 pub struct Game {
     player: Player,
     handles: Handles,
@@ -67,14 +74,15 @@ pub struct Game {
 
 fn main() {
     App::new()
+        .insert_resource(Msaa{samples: 1})
         .init_resource::<Game>()
-        .insert_resource(ImageSettings::default_nearest())
         .add_loopless_state(GameState::Init)
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            window: WindowDescriptor { title: "Hello".into(), ..default() },
+            ..default()
+        }))
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(EguiPlugin)
-        .add_plugin(benimator::AnimationPlugin::default())
         .add_startup_system(setup)
         .add_system(wait_for_assets.run_in_state(GameState::Init))
         .add_system(ui::draw_hud)
@@ -118,6 +126,8 @@ fn wait_for_assets(
                 vec2(image_size.x / 4.0, image_size.y),
                 4,
                 1,
+                None,
+                None,
             );
             game.handles.enemy_atlas = atlases.add(atlas);
         }
@@ -151,7 +161,6 @@ fn make_camera() -> Camera2dBundle {
     // the camera's translation by far and use a right handed coordinate system
     let mut projection = OrthographicProjection {
         far,
-        depth_calculation: DepthCalculation::ZDifference,
         scaling_mode: ScalingMode::FixedVertical(MAP_DIMS.y),
         ..Default::default()
     };
@@ -164,14 +173,15 @@ fn make_camera() -> Camera2dBundle {
         projection.far(),
     );
     Camera2dBundle {
-        camera_render_graph: CameraRenderGraph::new(bevy::core_pipeline::core_2d::graph::NAME),
         projection,
-        visible_entities: VisibleEntities::default(),
         frustum,
         transform,
-        global_transform: Default::default(),
-        camera: Camera::default(),
-        camera_2d: Camera2d::default(),
+        camera_2d: Camera2d{ clear_color: ClearColorConfig::Custom(Color::BLACK)},
+        camera: Camera {
+            hdr: true,
+            ..default()
+        },
+        ..default()
     }
 }
 
@@ -180,13 +190,22 @@ fn setup(
     mut game: ResMut<Game>,
     mut egui_settings: ResMut<EguiSettings>,
     asset_server: Res<AssetServer>,
-    mut animations: ResMut<Assets<SpriteSheetAnimation>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     // gui
     egui_settings.as_mut().scale_factor = 2.0;
 
     // camera
-    commands.spawn_bundle(make_camera());
+    commands.spawn((
+        make_camera(),
+        BloomSettings {
+            intensity: 0.3,
+            threshold: 0.6,
+            knee: 0.1,
+            ..default()
+        },
+    ));
 
     // load assets
     game.handles.map_tex = asset_server.load("../../../assets/map.png");
@@ -194,22 +213,28 @@ fn setup(
     game.handles.enemy_tex = asset_server.load("../../../assets/creature-sheet.png");
     game.handles.player_tex = asset_server.load("../../../assets/player.png");
 
-    game.handles.enemy_animation = animations.add(SpriteSheetAnimation::from_range(
-        0..=3,
-        Duration::from_millis(250),
-    ));
+    game.handles.player_mesh = meshes.add(make_mesh()).into();
+    game.handles.enemy_mesh = meshes.add(shape::Circle::new(10.0).into()).into();
+    game.handles.pickup_mesh = meshes.add(shape::Box::new(10.0, 10.0, 10.0).into()).into();
+    game.handles.bullet_mesh = meshes.add(shape::Circle::new(10.0).into()).into();
 
     // map
-    commands.spawn_bundle(MapBundle::new(Vec2::ZERO, game.handles.map_tex.clone()));
+    commands.spawn(MapBundle::new(Vec2::ZERO, game.handles.map_tex.clone()));
 
     //player
     game.player.id = Some(
         commands
-            .spawn_bundle(PlayerBundle::new(game.handles.player_tex.clone()))
+            .spawn(PlayerBundle::new(
+                materials.add(ColorMaterial {
+                    color: Color::hsla(130.0, 1.0, 0.5, 1.0),
+                    texture: None,
+                }),
+                game.handles.player_mesh.clone(),
+            ))
             .id(),
     );
 
-    commands.spawn_bundle(CursorBundle {
+    commands.spawn(CursorBundle {
         sprite: SpriteBundle {
             sprite: Sprite {
                 custom_size: Some(vec2(10.0, 10.0)),

@@ -1,4 +1,5 @@
 use crate::{physics_sprite::PhysicsSpriteBundle, *};
+use bevy::sprite::Mesh2dHandle;
 use rand::Rng;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -39,7 +40,7 @@ pub struct PickupBundle {
 impl PickupBundle {
     pub const PICKUP_DIMS: Vec2 = vec2(50.0, 50.0);
 
-    pub fn new(tex: Handle<Image>) -> PickupBundle {
+    pub fn new(tex: Handle<ColorMaterial>, mesh: Mesh2dHandle) -> PickupBundle {
         let r = rand::thread_rng().gen_range(0..4);
         let mut i = 0;
         let mut kind = PickupKind::default();
@@ -53,7 +54,7 @@ impl PickupBundle {
 
         return PickupBundle {
             pickup: Pickup { kind: kind },
-            sprite: PhysicsSpriteBundle::new(&PickupBundle::PICKUP_DIMS, &Vec2::ZERO, tex),
+            sprite: PhysicsSpriteBundle::new(&PickupBundle::PICKUP_DIMS, &Vec2::ZERO, tex, mesh),
         };
     }
 }

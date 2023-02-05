@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{physics_sprite::PhysicsSpriteBundle, *};
 
 #[derive(Component, Default)]
 pub struct Bullet {
@@ -19,25 +19,22 @@ impl Bullet {
 #[derive(Default, Bundle)]
 pub struct BulletBundle {
     bullet: Bullet,
-    collider: Collider,
-    sensor: Sensor,
     #[bundle]
-    sprite: SpriteBundle,
+    sprite: PhysicsSpriteBundle,
 }
 
 impl BulletBundle {
-    pub fn new(bullet: Bullet) -> Self {
+    pub fn new(bullet: Bullet, mesh: Mesh2dHandle) -> Self {
         BulletBundle {
-            collider: Collider::ball(bullet.radius),
-            sensor: Sensor,
-            sprite: SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgb(0.5, 0.5, 0.5),
-                    custom_size: Some(Vec2::ONE * 2.0 * bullet.radius),
-                    ..default()
-                },
-                transform: Transform {
-                    translation: bullet.position.extend(32.0f32),
+            sprite: PhysicsSpriteBundle {
+                collider: Collider::ball(bullet.radius),
+                sensor: Sensor,
+                mesh: ColorMesh2dBundle {
+                    transform: Transform {
+                        translation: bullet.position.extend(32.0f32),
+                        ..default()
+                    },
+                    mesh: mesh,
                     ..default()
                 },
                 ..default()

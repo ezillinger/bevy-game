@@ -109,13 +109,18 @@ pub fn draw_hud(mut egui_context: ResMut<EguiContext>, game: Res<Game>, windows:
                     ui.label(format!("Window: {:?}", game.window_size));
 
                     let mut bloom_settings = bloom_settings.single_mut();
-
                     ui.add(egui::Slider::new(&mut bloom_settings.knee, 0.0..=2.0).text("Knee"));
                     ui.add(egui::Slider::new(&mut bloom_settings.threshold, 0.0..=2.0).text("Threshold"));
                     ui.add(egui::Slider::new(&mut bloom_settings.intensity, 0.0..=2.0).text("Intensity"));
                     ui.add(egui::Slider::new(&mut bloom_settings.scale, 0.0..=2.0).text("Scale"));
                 }
                 ui.label(format!("Player: {:?}", game.player.position));
+
+                ui.label(format!("Damage: {}", game.player.stats.damage));
+                ui.label(format!("Shot Speed: {}", game.player.stats.shot_speed));
+                ui.label(format!("Shot Duration: {}", game.player.stats.shot_duration));
+                ui.label(format!("Shot Size: {}", game.player.stats.shot_size));
+                ui.label(format!("Fire Interval: {}", game.player.stats.fire_interval));
             }
         });
 }

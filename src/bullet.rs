@@ -8,6 +8,10 @@ pub struct Bullet {
     pub velocity: Vec2,
     pub damage: f32,
     pub radius: f32,
+
+    pub pierces: i32,
+    pub pierces_left: i32,
+    pub hit_enemies: Vec<Entity>,
 }
 
 impl Bullet {
@@ -66,11 +70,22 @@ pub fn tick(
             QueryFilter::default(),
             |entity| {
                 if let Ok(mut enemy) = enemies.get_mut(entity) {
-                    enemy.0.health -= bullet.damage;
-                    enemy.0.direction = bullet.velocity.normalize();
-                    commands.entity(bullet_entity).despawn();
-                    game.kills += 1;
-                    game.player.score += enemy.0.max_health;
+
+                    if let None = bullet.hit_enemies.iter().find(|&&x| x == entity){
+
+                        enemy.0.health -= bullet.damage;
+                        enemy.0.direction = bullet.velocity.normalize();
+                        game.kills += 1;
+                        game.player.score += enemy.0.max_health;
+
+                        bullet.pierces_left -= 1;
+                        if bullet.pierces_left <= 0 {
+                            commands.entity(bullet_entity).despawn();
+                        }
+                        else{
+                            bullet.hit_enemies.push(entity)
+                        }
+                    }
                 }
                 true
             },

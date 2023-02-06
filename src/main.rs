@@ -8,18 +8,15 @@ mod player;
 mod prelude;
 mod ui;
 
-use std::time::Duration;
-
 use bevy::{
     asset::LoadState,
     core_pipeline::{
-        bloom::BloomSettings, clear_color::ClearColorConfig, tonemapping::Tonemapping,
+        bloom::BloomSettings, clear_color::ClearColorConfig,
     },
     math::vec2,
     render::{
-        camera::{CameraProjection, CameraRenderGraph, RenderTarget, ScalingMode},
+        camera::{CameraProjection, ScalingMode},
         primitives::Frustum,
-        view::VisibleEntities,
     },
     sprite::Mesh2dHandle,
 };
@@ -159,7 +156,7 @@ fn make_camera() -> Camera2dBundle {
     let far = 1000.0;
     // we want 0 to be "closest" and +far to be "farthest" in 2d, so we offset
     // the camera's translation by far and use a right handed coordinate system
-    let mut projection = OrthographicProjection {
+    let projection = OrthographicProjection {
         far,
         scaling_mode: ScalingMode::FixedVertical(MAP_DIMS.y),
         ..Default::default()

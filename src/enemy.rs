@@ -79,7 +79,31 @@ pub fn tick(
     mut game: ResMut<Game>,
     rapier_ctx: Res<RapierContext>,
 ) {
+    let mut m = Vec::new();
+    for (entity, mut enemy, mut transform, collider, mut sprite) in enemies.iter() {
+        let mut overlap = Vec2::ZERO;
+        rapier_ctx.intersections_with_shape(
+                transform.translation.truncate(),
+                0.0,
+                collider,
+                QueryFilter::default(),
+                |intersecting_entity| {
+                    if intersecting_entity != entity && intersecting_entity != game.player.id.unwrap() {
+                        if let Ok(other) = enemies.get(intersecting_entity) {
+                            let dir = (enemy.position - other.1.position).normalize();
+                            overlap += 10.0 * dir;
+                            print!("Overlap ep {} op {}\n", enemy.position, other.1.position);
+                        }
+                    }
+                    return true;
+                },
+            );
+            m.push(overlap);
+    }
+
+    let mut i = 0;
     for (entity, mut enemy, mut transform, collider, mut sprite) in enemies.iter_mut() {
+
         if enemy.health <= 0.0 {
             commands.entity(entity).despawn();
         }
@@ -90,7 +114,8 @@ pub fn tick(
         let player_dist = (game.player.position - enemy.position).length();
         enemy.direction = (25.5 * enemy.direction
             + (player_dist / 700.0) * 10.5 * rand_norm_vec2()
-            + (1.0 - player_dist / 700.0) * 5.25 * player_dir)
+            + (1.0 - player_dist / 700.0) * 5.25 * player_dir
+            + *m.get(i).expect("oob"))
             .normalize();
         let new_pos = enemy.position + enemy.direction * enemy.speed;
 
@@ -123,5 +148,6 @@ pub fn tick(
                 },
             );
         }
+        i += 1;
     }
 }

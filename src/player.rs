@@ -2,9 +2,9 @@ use std::{time::Duration, f32::consts::PI};
 
 use crate::*;
 use bevy::{time::Stopwatch, sprite::Mesh2dHandle};
-use bevy_rapier2d::na::Rotation2;
 use map::clamp_position;
 use physics_sprite::PhysicsSpriteBundle;
+use std::fmt;
 
 const PLAYER_DIMS: Vec2 = vec2(40.0, 45.0);
 
@@ -49,6 +49,13 @@ impl Stats {
             shot_duration: Stat::new(1.0),
             shot_size: Stat::new(10.0),
         }
+    }
+
+}
+
+impl fmt::Display for Stat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({} * {} + {})", self.value(), self.base, self.multiply, self.add)
     }
 }
 
@@ -197,13 +204,17 @@ pub fn tick(
             velocity: velocity * game.player.direction,
             damage: game.player.stats.damage.value(),
             radius: game.player.stats.shot_size.value(),
+            hit_enemies: Default::default(),
+            pierces: 2,
+            pierces_left: 2
+            
         }, game.handles.bullet_mesh.clone()));
 
         game.player.shot_clock.reset();
     }
 
     let angle = game.player.direction.y.atan2(game.player.direction.x);
-    if let Ok((mut sprite, mut transform)) = player.get_single_mut() {
+    if let Ok((mut _sprite, mut transform)) = player.get_single_mut() {
         *transform = Transform {
             translation: Vec3::new(
                 game.player.position.x,
@@ -213,6 +224,5 @@ pub fn tick(
             rotation: Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), angle - PI/2.0),
             ..default()
         };
-        // sprite.flip_x = game.player.direction.x < 0.0;
     }
 }

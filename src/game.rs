@@ -1,20 +1,29 @@
 use crate::*;
+use rand::Rng;
+use strum::IntoEnumIterator;
 
 pub fn spawn_waves(
     mut commands: Commands,
     mut game: ResMut<Game>,
-    mut colors: ResMut<Assets<ColorMaterial>>,
+    colors: ResMut<Assets<ColorMaterial>>,
+    meshes: ResMut<Assets<Mesh>>,
     enemies: Query<(Entity, With<Enemy>)>,
     pickups: Query<(Entity, (With<Pickup>, Without<Enemy>))>,
 ) {
     if enemies.is_empty() && pickups.is_empty() {
-        if game.wave % 5 == 0 {
-            commands.spawn(PickupBundle::new(
-                colors.add(ColorMaterial {
-                    color: Color::rgba(1.0, 0.0, 0.0, 1.0).into(),
-                    texture: None,
-                }),
-                game.handles.pickup_mesh.clone(),
+        if game.wave % 2 == 0 {
+            let r = rand::thread_rng().gen_range(0..4);
+            let mut i = 0;
+            let mut kind = PickupKind::default();
+            for k in PickupKind::iter() {
+                if i == r {
+                    kind = k;
+                    break;
+                }
+                i += 1;
+            };
+            commands.spawn(PickupBundle::from_kind(
+                Vec2::ZERO, kind, colors, meshes
             ));
         } else {
             for _ in 0..(game.wave + 5) {

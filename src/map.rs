@@ -30,7 +30,7 @@ impl MapBundle {
                 texture: tex,
                 sprite: Sprite {
                     custom_size: Some(MAP_DIMS),
-                    color: Color::hsla(0.0, 0.0, 0.5, 0.5),
+                    color: Color::hsla(0.0, 0.0, 0.0, 0.0),
                     ..default()
                 },
                 transform: Transform {

@@ -1,6 +1,6 @@
 use crate::*;
 use rand::Rng;
-use strum::IntoEnumIterator;
+use strum::{IntoEnumIterator, EnumCount};
 
 pub fn spawn_waves(
     mut commands: Commands,
@@ -12,7 +12,7 @@ pub fn spawn_waves(
 ) {
     if enemies.is_empty() && pickups.is_empty() {
         if game.wave % 2 == 0 {
-            let r = rand::thread_rng().gen_range(0..4);
+            let r = rand::thread_rng().gen_range(0..PickupKind::COUNT);
             let mut i = 0;
             let mut kind = PickupKind::default();
             for k in PickupKind::iter() {

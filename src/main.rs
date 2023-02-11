@@ -109,6 +109,7 @@ fn wait_for_assets(
     asset_server: ResMut<AssetServer>,
 ) {
     println!("Waiting for assets");
+
     if LoadState::Loaded == asset_server.get_load_state(&game.handles.enemy_tex)
         && LoadState::Loaded == asset_server.get_load_state(&game.handles.player_tex)
         && LoadState::Loaded == asset_server.get_load_state(&game.handles.map_tex)
@@ -205,10 +206,10 @@ fn setup(
     ));
 
     // load assets
-    game.handles.map_tex = asset_server.load("../../../assets/map.png");
-    game.handles.pickup_tex = asset_server.load("../../../assets/pickup.png");
-    game.handles.enemy_tex = asset_server.load("../../../assets/creature-sheet.png");
-    game.handles.player_tex = asset_server.load("../../../assets/player.png");
+    game.handles.map_tex = asset_server.load("map.png");
+    game.handles.pickup_tex = asset_server.load("pickup.png");
+    game.handles.enemy_tex = asset_server.load("creature-sheet.png");
+    game.handles.player_tex = asset_server.load("player.png");
 
     game.handles.player_mesh = meshes.add(make_mesh()).into();
     game.handles.enemy_mesh = meshes.add(shape::Circle::new(10.0).into()).into();

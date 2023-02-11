@@ -3,16 +3,17 @@ use bevy::prelude::*;
 use bevy::sprite::Mesh2dHandle;
 use player::Player;
 use rand::Rng;
-use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
+use strum::{IntoEnumIterator, EnumCount};
+use strum_macros::{EnumIter, EnumCount};
 
-#[derive(Default, EnumIter, Debug, Clone)]
+#[derive(Default, EnumIter, Debug, Clone, EnumCount)]
 pub enum PickupKind {
     #[default]
     MaxHealthUp,
     DamageUp,
     ShotSpeedUp,
     FireRateUp,
+    PiercingUp,
 }
 
 #[derive(Component, Default)]
@@ -31,6 +32,7 @@ impl Pickup {
             }
             PickupKind::ShotSpeedUp => player.stats.shot_speed.multiply += 0.1,
             PickupKind::FireRateUp => player.stats.fire_interval.multiply -= 0.1,
+            PickupKind::PiercingUp => player.stats.piercing.add += 1.0,
         }
     }
 
@@ -40,6 +42,7 @@ impl Pickup {
             PickupKind::DamageUp => Color::ORANGE,
             PickupKind::FireRateUp => Color::GREEN,
             PickupKind::ShotSpeedUp => Color::LIME_GREEN,
+            PickupKind::PiercingUp => Color::PURPLE,
         }
     }
 }
@@ -55,7 +58,7 @@ impl PickupBundle {
     pub const PICKUP_DIMS: Vec2 = vec2(50.0, 50.0);
 
     pub fn new(tex: Handle<ColorMaterial>, mesh: Mesh2dHandle) -> PickupBundle {
-        let r = rand::thread_rng().gen_range(0..4);
+        let r = rand::thread_rng().gen_range(0..PickupKind::COUNT);
         let mut i = 0;
         let mut kind = PickupKind::default();
         for k in PickupKind::iter() {

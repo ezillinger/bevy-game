@@ -1,7 +1,8 @@
-use std::{time::Duration, f32::consts::PI};
+use std::{f32::consts::PI, time::Duration};
 
 use crate::*;
-use bevy::{time::Stopwatch, sprite::Mesh2dHandle};
+use bevy::{sprite::Mesh2dHandle, time::Stopwatch};
+use bevy_rapier2d::parry::utils::Interval;
 use map::clamp_position;
 use physics_sprite::PhysicsSpriteBundle;
 use std::fmt;
@@ -31,31 +32,43 @@ impl Stat {
 
 #[derive(Component)]
 pub struct Stats {
+    pub damage: Stat,
+    pub speed: Stat,
     pub max_health: Stat,
     pub shot_duration: Stat,
     pub shot_speed: Stat,
     pub shot_size: Stat,
     pub fire_interval: Stat,
-    pub damage: Stat,
+    pub piercing: Stat,
+    pub mass: Stat,
 }
 
 impl Stats {
     fn new() -> Stats {
         Stats {
             damage: Stat::new(60.0),
+            speed: Stat::new(100.0),
             max_health: Stat::new(100.0),
-            fire_interval: Stat::new(0.5),
+            fire_interval: Stat::new(0.25),
             shot_speed: Stat::new(500.0),
             shot_duration: Stat::new(1.0),
             shot_size: Stat::new(10.0),
+            piercing: Stat::new(1.0),
+            mass: Stat::new(100.0),
         }
     }
-
 }
 
 impl fmt::Display for Stat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} ({} * {} + {})", self.value(), self.base, self.multiply, self.add)
+        write!(
+            f,
+            "{} ({} * {} + {})",
+            self.value(),
+            self.base,
+            self.multiply,
+            self.add
+        )
     }
 }
 
@@ -63,6 +76,7 @@ impl fmt::Display for Stat {
 pub struct Player {
     pub position: Vec2,
     pub direction: Vec2,
+    pub momentum: Vec2,
     pub id: Option<Entity>,
     pub shot_clock: Stopwatch,
     pub score: i32,
@@ -81,6 +95,7 @@ impl Default for Player {
             score: 0,
             id: None,
             stats: Stats::new(),
+            momentum: Vec2::ZERO,
         };
     }
 }
@@ -160,14 +175,12 @@ pub fn tick(
     mut player: Query<(&mut Mesh2dHandle, &mut Transform), With<Player>>,
     cursor: Query<&Cursor>,
 ) {
-    const PLAYER_SPEED: f32 = 400.0;
-
     if input.pressed(KeyCode::Escape) {
         commands.insert_resource(NextState(GameState::Paused));
         return;
     }
 
-    if game.player.health <= 0.0 {
+    if game.player.health <= 0.0  {
         commands.insert_resource(NextState(GameState::GameOver));
         return;
     }
@@ -179,36 +192,55 @@ pub fn tick(
         game.mouse_world_pos = cursor.world_pos;
     }
 
-    if input.pressed(KeyCode::Left) || input.pressed(KeyCode::A) {
-        game.player.position.x -= PLAYER_SPEED * time.delta().as_secs_f32();
-    } else if input.pressed(KeyCode::Right) || input.pressed(KeyCode::D) {
-        game.player.position.x += PLAYER_SPEED * time.delta().as_secs_f32();
+    let mut input_dir = Vec2::ZERO;
+    if input.pressed(KeyCode::Right) || input.pressed(KeyCode::D) {
+        input_dir.x = 1.0;
+    } else if input.pressed(KeyCode::Left) || input.pressed(KeyCode::A) {
+        input_dir.x = -1.0;
     }
 
     if input.pressed(KeyCode::Up) || input.pressed(KeyCode::W) {
-        game.player.position.y += PLAYER_SPEED * time.delta().as_secs_f32();
+        input_dir.y = 1.0;
     } else if input.pressed(KeyCode::Down) || input.pressed(KeyCode::S) {
-        game.player.position.y -= PLAYER_SPEED * time.delta().as_secs_f32();
+        input_dir.y = -1.0;
     }
+
+    input_dir = input_dir.normalize_or_zero();
+
+    let time = time.delta_seconds();
+    let speed = game.player.stats.speed.value();
+    let force = speed * input_dir * time;
+    let momentum = game.player.momentum + force;
+    game.player.position += momentum;
+
+    let drag = 0.75;
+    let drag_force = drag * game.player.momentum.normalize_or_zero() * game.player.momentum.length_squared() * time;
+    game.player.momentum = momentum - drag_force;
 
     game.player.position = clamp_position(&game.player.position);
 
+    let fire_interval = game.player.stats.fire_interval.value()
+        * if input.pressed(KeyCode::LShift) {
+            0.1
+        } else {
+            1.0
+        };
     if (input.pressed(KeyCode::Space) || mouse.pressed(MouseButton::Left))
-        && game.player.shot_clock.elapsed_secs() >= game.player.stats.fire_interval.value()
+        && game.player.shot_clock.elapsed_secs() >= fire_interval
     {
-        let velocity = if input.pressed(KeyCode::LShift) { game.player.stats.shot_speed.value() * 10.0 } else { game.player.stats.shot_speed.value() };
-        commands.spawn(BulletBundle::new(Bullet {
-            shooter: Some(game.player.id.unwrap()),
-            position: game.player.position,
-            hits_player: false,
-            velocity: velocity * game.player.direction,
-            damage: game.player.stats.damage.value(),
-            radius: game.player.stats.shot_size.value(),
-            hit_enemies: Default::default(),
-            pierces: 2,
-            pierces_left: 2
-            
-        }, game.handles.bullet_mesh.clone()));
+        commands.spawn(BulletBundle::new(
+            Bullet {
+                shooter: Some(game.player.id.unwrap()),
+                position: game.player.position,
+                hits_player: false,
+                velocity: game.player.stats.shot_speed.value() * game.player.direction,
+                damage: game.player.stats.damage.value(),
+                radius: game.player.stats.shot_size.value(),
+                hit_enemies: Default::default(),
+                piercing: game.player.stats.piercing.value() as i32,
+            },
+            game.handles.bullet_mesh.clone(),
+        ));
 
         game.player.shot_clock.reset();
     }
@@ -221,7 +253,7 @@ pub fn tick(
                 game.player.position.y,
                 z_from_y(game.player.position.y),
             ),
-            rotation: Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), angle - PI/2.0),
+            rotation: Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), angle - PI / 2.0),
             ..default()
         };
     }
